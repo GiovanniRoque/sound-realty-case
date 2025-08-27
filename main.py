@@ -54,4 +54,15 @@ class ModelLoader:
         except Exception as e:
             raise e
 
+# Create an instance of the loader
+model_loader = ModelLoader()
 
+# Start FastAPI
+app = FastAPI(title="Sound Realty House Price Prediction API",
+              description="API for predicting house prices using a KNeighborsRegressor model from SKLearn.",
+              version="1.0.0")
+
+@app.on_event("startup")
+async def startup_event():
+    # Load model when model starts
+    model_loader.load_model_and_data()
