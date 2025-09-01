@@ -2,6 +2,8 @@ import logging
 import os
 import pickle 
 import json
+import threading
+import datetime
 
 from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel
@@ -20,9 +22,13 @@ MODEL_PATH = os.path.join(MODEL_DIR, 'model.pkl')
 FEATURES_PATH = os.path.join(MODEL_DIR, 'model_features.json')
 DEMOGRAPHICS_PATH = os.path.join(DATA_DIR, 'zipcode_demographics.csv')
 
+class ModelNotLoadedException:
+    pass
+
 # Response model
 class PredictionResponse(BaseModel):
     predicted_price: float
+    metadata: dict
 
 # Request model
 class HouseDataRequest(BaseModel):
@@ -47,34 +53,54 @@ class ModelLoader:
         self.model_features = []
         self.demographics_df = pd.DataFrame()
         self.model_filename = ""
+        self.last_updated = datetime.datetime.now()
         self.loaded = False
+        self._lock = threading.Lock()
 
     def load_model_and_data(self, model_path=MODEL_PATH, features_path=FEATURES_PATH):
         """Loads the model, feature list, and demographics data."""
-        try:
-            with open(model_path, 'rb') as f:
-                self.model: Pipeline = pickle.load(f)
-            logger.info(f"Model loaded: {model_path}")
+        with self._lock:
+            try:
+                with open(model_path, 'rb') as f:
+                    self.model: Pipeline = pickle.load(f)
+                logger.info(f"Model loaded: {model_path}")
 
-            with open(features_path, 'r') as f:
-                self.model_features = json.load(f)
-            logger.info(f"Model features loaded: {features_path}")
+                with open(features_path, 'r') as f:
+                    self.model_features = json.load(f)
+                logger.info(f"Model features loaded: {features_path}")
 
-            # using zipcode as str since it's a str in kc_house_data, index for merging
-            self.demographics_df = pd.read_csv(DEMOGRAPHICS_PATH, dtype={'zipcode': str})
-            self.demographics_df.set_index('zipcode', inplace=True)
-            logger.info(f"Demographics data loaded: {DEMOGRAPHICS_PATH}")
+                # using zipcode as str since it's a str in kc_house_data, index for merging
+                self.demographics_df = pd.read_csv(DEMOGRAPHICS_PATH, dtype={'zipcode': str})
+                self.demographics_df.set_index('zipcode', inplace=True)
+                logger.info(f"Demographics data loaded: {DEMOGRAPHICS_PATH}")
 
-            self.loaded = True
-            self.model_filename =  model_path.split('/')[1] # Extract filename from modelpath
-            logger.info(f"All model data loaded successfully!")
+                self.loaded = True
+                self.model_filename =  os.path.basename(model_path) # Extract filename from modelpath
+                self.last_updated = datetime.datetime.now()
+                logger.info(f"All model data loaded successfully!")
 
-        except FileNotFoundError as e:
-            logger.error(f"File not found: {e}")
-            raise e
+            except FileNotFoundError as e:
+                logger.error(f"File not found: {e}")
+                raise e
+            
+            except Exception as e:
+                raise e
+
+    def get_model_data(self):
+        """Get current model data safely."""
+        with self._lock:
+            if not self.loaded:
+                raise ModelNotLoadedException("Model not loaded")
+            
+            return {
+                "model": self.model,
+                "model_features": self.model_features.copy(),
+                "demographics_df": self.demographics_df.copy(),
+                "model_filename": self.model_filename,
+                "loaded": self.loaded,
+                "last_updated": self.last_updated
+            }
         
-        except Exception as e:
-            raise e
 
 # Create an instance of the loader
 model_loader = ModelLoader()
@@ -93,27 +119,31 @@ async def startup_event():
 
 @app.post("/predict", response_model=PredictionResponse, status_code=status.HTTP_200_OK)
 async def predict(house_data: HouseDataRequest):
-
-    if not model_loader.loaded:
-        logger.error("Model and data not loaded")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail="Model or data not initialized")
-
-    # Access model from loader
-    model = model_loader.model
-    model_features = model_loader.model_features
-    demographics_df = model_loader.demographics_df
-
     try:
+        predict_start = datetime.datetime.now()
+        model_data = model_loader.get_model_data()
+        # Access model from loader
+        model_data = model_loader.get_model_data()
+        model = model_data['model']
+        demographics_df = model_data['demographics_df']
+
         # Merge the input data to the demographics dataframe as it was done on create_model
         input_house_data = pd.DataFrame([house_data.model_dump()])
         merged_house_data = input_house_data.merge(demographics_df, how="left", left_on='zipcode', right_index=True).drop(columns=['zipcode'])
         logger.info(f"Merged dataframe shape: {merged_house_data.shape}")
 
         prediction = model.predict(merged_house_data)[0]
-        logger.info(f"Prediction done with: {model_loader.model_filename}!")
+        predict_end = datetime.datetime.now()
+        predict_timedelta = predict_end - predict_start
 
-        return PredictionResponse(predicted_price=float(prediction))
+        logger.info(f"Prediction done with: {model_loader.model_filename} in {predict_timedelta.microseconds} microseconds")
+
+        return PredictionResponse(predicted_price=float(prediction), metadata={"last_updated": model_data["last_updated"], "model_filename": model_data["model_filename"], "prediction_time_microseconds": predict_timedelta.microseconds})
+    
+    except ModelNotLoadedException: 
+        logger.error("Model and data not loaded")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="Model or data not initialized")
     except Exception as e:
         # Generic error for initial debugging
         logger.exception(f"Unexpected error during prediction: {e}")
@@ -121,8 +151,8 @@ async def predict(house_data: HouseDataRequest):
                             detail="An internal error occurred during prediction")
     
 @app.post("/promote", status_code=status.HTTP_200_OK)
-async def promote(model_promotion: ModelPromotionRequest):
-
+async def promote(model_promotion: ModelPromotionRequest): 
+    # Currently this only promotes the state of one guvicorn worker, will refactor to rethink this approach
     new_model_path = os.path.join(MODEL_DIR, model_promotion.model_filename)
     new_features_path = os.path.join(MODEL_DIR, model_promotion.features_filename)
 
