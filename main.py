@@ -31,6 +31,7 @@ class PredictionResponse(BaseModel):
     metadata: dict
 
 # Request model
+# If new base features are added, we need to add them here.
 class HouseDataRequest(BaseModel):
     bedrooms: float
     bathrooms: float
