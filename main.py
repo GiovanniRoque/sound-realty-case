@@ -85,11 +85,16 @@ class ModelLoader:
             
             except Exception as e:
                 raise e
+            
+    def is_loaded(self):
+        """Check if model is loaded for health checks."""
+        return self.loaded
+
 
     def get_model_data(self):
         """Get current model data safely."""
         with self._lock:
-            if not self.loaded:
+            if not self.is_loaded():
                 raise ModelNotLoadedException("Model not loaded")
             
             return {
@@ -121,7 +126,6 @@ async def startup_event():
 async def predict(house_data: HouseDataRequest):
     try:
         predict_start = datetime.datetime.now()
-        model_data = model_loader.get_model_data()
         # Access model from loader
         model_data = model_loader.get_model_data()
         model = model_data['model']
@@ -171,7 +175,7 @@ async def promote(model_promotion: ModelPromotionRequest):
 @app.get("/health", status_code=status.HTTP_200_OK)
 async def health():
     """Simple health check endpoint."""
-    if model_loader.model is not None and not model_loader.demographics_df.empty and model_loader.model_features:
+    if model_loader.is_loaded():
         return {"status": "healthy"}
     else:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
