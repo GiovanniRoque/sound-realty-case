@@ -124,6 +124,7 @@ async def startup_event():
 
 @app.post("/predict", response_model=PredictionResponse, status_code=status.HTTP_200_OK)
 async def predict(house_data: HouseDataRequest):
+    """Runs the predictions for the house price prediction model."""
     try:
         predict_start = datetime.datetime.now()
         # Access model from loader
@@ -156,6 +157,7 @@ async def predict(house_data: HouseDataRequest):
     
 @app.post("/promote", status_code=status.HTTP_200_OK)
 async def promote(model_promotion: ModelPromotionRequest): 
+    """Promotes a new model in runtime."""
     # Currently this only ensures the promotion of the state in one guvicorn worker. When deploying, scale resources horizontally instead of vertically.
     # Ideally, promotion should also be registered in a database to persist information when restoring the cluster. Saving locally won't be enough as it would only be inside the container.
 
