@@ -9,6 +9,9 @@ from sklearn import model_selection
 from sklearn import neighbors
 from sklearn import pipeline
 from sklearn import preprocessing
+from sklearn import metrics
+
+import numpy as np
 
 SALES_PATH = "data/kc_house_data.csv"  # path to CSV with home sale data
 DEMOGRAPHICS_PATH = "data/kc_house_data.csv"  # path to CSV with demographics
@@ -52,6 +55,22 @@ def load_data(
     return x, y
 
 
+def evaluate_model_test_set(model_pipeline: pipeline.Pipeline, x_test, y_test):
+    """Evaluate using the test set."""
+
+    # Optional: Train on full set and evaluate on a hold-out test set for final metrics
+    print("\n--- Hold-Out Test Set Evaluation ---")
+    y_pred = model_pipeline.predict(x_test)
+
+    test_mae = metrics.mean_absolute_error(y_test, y_pred)
+    test_rmse = np.sqrt(metrics.mean_squared_error(y_test, y_pred))
+    test_r2 = metrics.r2_score(y_test, y_pred)
+
+    print(f"Test Set Mean Absolute Error: {test_mae:,.2f}.")
+    print(f"Test Set Root Mean Square Error: {test_rmse:,.2f}.")
+    print(f"Test Set R-squared value: {test_r2:.4f}. The model explains approximately {test_r2*100:.1f}% of the variance in house prices in the test set.")
+
+
 def main():
     """Load data, train model, and export artifacts."""
     x, y = load_data(SALES_PATH, DEMOGRAPHICS_PATH, SALES_COLUMN_SELECTION)
@@ -59,8 +78,7 @@ def main():
         x, y, random_state=42)
 
     model = pipeline.make_pipeline(preprocessing.RobustScaler(),
-                                   neighbors.KNeighborsRegressor()).fit(
-                                       x_train, y_train)
+                                   neighbors.KNeighborsRegressor()).fit(x_train, y_train)
 
     output_dir = pathlib.Path(OUTPUT_DIR)
     output_dir.mkdir(exist_ok=True)
@@ -69,7 +87,8 @@ def main():
     pickle.dump(model, open(output_dir / "model.pkl", 'wb'))
     json.dump(list(x_train.columns),
               open(output_dir / "model_features.json", 'w'))
-
+    
+    evaluate_model_test_set(model, _x_test, _y_test)
 
 if __name__ == "__main__":
     main()
