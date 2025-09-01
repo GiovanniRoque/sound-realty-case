@@ -35,6 +35,10 @@ class HouseDataRequest(BaseModel):
     sqft_basement: float
     zipcode: str
 
+# Promotion request model
+class ModelPromotionRequest(BaseModel):
+    model_filename: str
+    features_filename: str
 
 class ModelLoader:
     """Encapsulates the loaded model, features and demographics data."""
@@ -42,18 +46,19 @@ class ModelLoader:
         self.model = None
         self.model_features = []
         self.demographics_df = pd.DataFrame()
+        self.model_filename = ""
         self.loaded = False
 
-    def load_model_and_data(self):
+    def load_model_and_data(self, model_path=MODEL_PATH, features_path=FEATURES_PATH):
         """Loads the model, feature list, and demographics data."""
         try:
-            with open(MODEL_PATH, 'rb') as f:
+            with open(model_path, 'rb') as f:
                 self.model: Pipeline = pickle.load(f)
-            logger.info(f"Model loaded: {MODEL_PATH}")
+            logger.info(f"Model loaded: {model_path}")
 
-            with open(FEATURES_PATH, 'r') as f:
+            with open(features_path, 'r') as f:
                 self.model_features = json.load(f)
-            logger.info(f"Model features loaded: {FEATURES_PATH}")
+            logger.info(f"Model features loaded: {features_path}")
 
             # using zipcode as str since it's a str in kc_house_data, index for merging
             self.demographics_df = pd.read_csv(DEMOGRAPHICS_PATH, dtype={'zipcode': str})
@@ -61,6 +66,7 @@ class ModelLoader:
             logger.info(f"Demographics data loaded: {DEMOGRAPHICS_PATH}")
 
             self.loaded = True
+            self.model_filename =  model_path.split('/')[1] # Extract filename from modelpath
             logger.info(f"All model data loaded successfully!")
 
         except FileNotFoundError as e:
@@ -81,7 +87,7 @@ app = FastAPI(title="Sound Realty House Price Prediction API",
 @app.on_event("startup")
 async def startup_event():
     # Load model when model starts
-    logger.info("Starting up application")
+    logger.info("Starting up application with base model")
     model_loader.load_model_and_data()
     logger.info("Application startup complete!")
 
@@ -105,7 +111,7 @@ async def predict(house_data: HouseDataRequest):
         logger.info(f"Merged dataframe shape: {merged_house_data.shape}")
 
         prediction = model.predict(merged_house_data)[0]
-        logger.info("Prediction successful!")
+        logger.info(f"Prediction done with: {model_loader.model_filename}!")
 
         return PredictionResponse(predicted_price=float(prediction))
     except Exception as e:
@@ -113,3 +119,30 @@ async def predict(house_data: HouseDataRequest):
         logger.exception(f"Unexpected error during prediction: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail="An internal error occurred during prediction")
+    
+@app.post("/promote", status_code=status.HTTP_200_OK)
+async def promote(model_promotion: ModelPromotionRequest):
+
+    new_model_path = os.path.join(MODEL_DIR, model_promotion.model_filename)
+    new_features_path = os.path.join(MODEL_DIR, model_promotion.features_filename)
+
+    try:
+        model_loader.load_model_and_data(model_path=new_model_path, features_path=new_features_path)
+        return {"status": "promoted"}
+    except FileNotFoundError as e:
+        logger.error(e)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="Could not find files")
+    except Exception as e:
+      logger.exception(f"Unexpected error during promotion: {e}")
+      raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="Could not load new model")
+    
+@app.get("/health", status_code=status.HTTP_200_OK)
+async def health():
+    """Simple health check endpoint."""
+    if model_loader.model is not None and not model_loader.demographics_df.empty and model_loader.model_features:
+        return {"status": "healthy"}
+    else:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                            detail={"status": "unhealthy"})
