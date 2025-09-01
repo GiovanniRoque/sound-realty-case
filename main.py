@@ -76,7 +76,7 @@ class ModelLoader:
 
                 self.loaded = True
                 self.model_filename =  os.path.basename(model_path) # Extract filename from modelpath
-                self.last_updated = datetime.datetime.now()
+                self.last_updated = datetime.datetime.now().isoformat()
                 logger.info(f"All model data loaded successfully!")
 
             except FileNotFoundError as e:
@@ -105,7 +105,6 @@ class ModelLoader:
                 "loaded": self.loaded,
                 "last_updated": self.last_updated
             }
-        
 
 # Create an instance of the loader
 model_loader = ModelLoader()
@@ -156,7 +155,9 @@ async def predict(house_data: HouseDataRequest):
     
 @app.post("/promote", status_code=status.HTTP_200_OK)
 async def promote(model_promotion: ModelPromotionRequest): 
-    # Currently this only promotes the state of one guvicorn worker, will refactor to rethink this approach
+    # Currently this only ensures the promotion of the state in one guvicorn worker. When deploying, scale resources horizontally instead of vertically.
+    # Ideally, promotion should also be registered in a database to persist information when restoring the cluster. Saving locally won't be enough as it would only be inside the container.
+
     new_model_path = os.path.join(MODEL_DIR, model_promotion.model_filename)
     new_features_path = os.path.join(MODEL_DIR, model_promotion.features_filename)
 
