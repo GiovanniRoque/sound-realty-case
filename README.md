@@ -8,6 +8,8 @@ These instructions will get you a copy of the project up and running on your loc
 ### Prerequisites
 
 *   **Docker:** Install Docker Desktop or Docker Engine by following the official guide: [https://docs.docker.com/get-started/](https://docs.docker.com/get-started/)
+*   **(Alternative) Conda:** If you prefer running locally without Docker, install Miniconda or Anaconda: [https://docs.conda.io/en/latest/](https://docs.conda.io/en/latest/)
+
 
 ### Setup & Running
 
@@ -26,13 +28,53 @@ These instructions will get you a copy of the project up and running on your loc
 
 4.  **Run the Docker Container:**
     ```bash
-    docker run -p 8000:8000 sound-realty-api
+    docker run -p 5000:5000 house-price-api
     ```
-    This command maps port 8000 on your local machine to port 8000 inside the container.
+    This command maps port 5000 on your local machine to port 5000 inside the container.
 
 5.  **Access the API:**
     The API will be available at `http://localhost:5000`.
     *   Interactive API documentation (Swagger UI): `http://localhost:5000/docs`
+
+
+#### Running Locally (with Conda)
+
+1.  **Clone or Download the Repository:**
+    Obtain the project files.
+
+2.  **Navigate to the Project Directory:**
+    Open your terminal or command prompt and change to the project's root directory.
+
+3.  **Create and Activate the environment:**
+    ```bash
+    conda env create -f conda_environment.yml
+    conda activate housing
+    ```
+    This command maps creates and activates the local environment.
+
+4.  **Create and Evaluate the model:**
+    Once you've created and activated the environment, you can run the script which
+    creates and evaluates the fitted model with the hold-out test set:
+    ```sh
+    python create_model.py
+    ```
+
+5.  **Cross-Validate the model:**
+    You can also run a cross-validation script to evaluate the model with more detail:
+    ```sh
+    python evaluate_model.py
+    ```
+
+6.  **Run the API:**
+    Once the model is created locally, run the fastapi app:
+    ```sh
+    python -m fastapi run main.py
+    ```
+
+7.  **Access the API:**
+    The API will be available at `http://localhost:5000`.
+    *   Interactive API documentation (Swagger UI): `http://localhost:5000/docs`
+
 
 ## API Endpoints
 
