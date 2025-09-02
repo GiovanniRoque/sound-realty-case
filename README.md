@@ -19,7 +19,7 @@ These instructions will get you a copy of the project up and running on your loc
     Obtain the project files.
 
 2.  **Navigate to the Project Directory:**
-    Open your terminal or command prompt and change to the project's root directory.
+    Open your terminal or command prompt and change to the project`s root directory.
 
 3.  **Build the Docker Image:**
     ```bash
@@ -43,7 +43,7 @@ These instructions will get you a copy of the project up and running on your loc
     Obtain the project files.
 
 2.  **Navigate to the Project Directory:**
-    Open your terminal or command prompt and change to the project's root directory.
+    Open your terminal or command prompt and change to the project`s root directory.
 
 3.  **Create and Activate the environment:**
     ```bash
