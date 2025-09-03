@@ -22,7 +22,7 @@ MODEL_PATH = os.path.join(MODEL_DIR, 'model.pkl')
 FEATURES_PATH = os.path.join(MODEL_DIR, 'model_features.json')
 DEMOGRAPHICS_PATH = os.path.join(DATA_DIR, 'zipcode_demographics.csv')
 
-class ModelNotLoadedException:
+class ModelNotLoadedException(Exception):
     pass
 
 # Response model
@@ -31,7 +31,6 @@ class PredictionResponse(BaseModel):
     metadata: dict
 
 # Request model
-# If new base features are added, we need to add them here.
 class HouseDataRequest(BaseModel):
     bedrooms: float
     bathrooms: float
@@ -169,8 +168,8 @@ async def promote(model_promotion: ModelPromotionRequest):
         return {"status": "promoted"}
     except FileNotFoundError as e:
         logger.error(e)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail="Could not find files")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Specified model or features file not found")
     except Exception as e:
       logger.exception(f"Unexpected error during promotion: {e}")
       raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
