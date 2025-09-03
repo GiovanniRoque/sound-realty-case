@@ -147,7 +147,7 @@ async def predict(house_data: HouseDataRequest):
     
     except ModelNotLoadedException: 
         logger.error("Model and data not loaded")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                             detail="Model or data not initialized")
     except Exception as e:
         # Generic error for initial debugging
