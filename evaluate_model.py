@@ -47,5 +47,30 @@ def evaluate_model():
     print(f"The model's average absolute error is around ${mae_scores.mean():,.0f}.")
     print(f"The R-squared value of ~{cv_scores_r2.mean():.3f} indicates that the model explains approximately {cv_scores_r2.mean()*100:.1f}% of the variance in house prices.")
 
+def plot_graph():
+    import matplotlib.pyplot as plt
+    x, y = load_data(SALES_PATH, DEMOGRAPHICS_PATH, SALES_COLUMN_SELECTION)
+    x_train, _x_test, y_train, _y_test = model_selection.train_test_split(
+        x, y, random_state=42)
+    
+    # Define the model pipeline (same as in create_model.py)
+    model = pipeline.make_pipeline(preprocessing.RobustScaler(),
+                                   neighbors.KNeighborsRegressor()).fit(x_train, y_train)
+
+    y_pred = model.predict(_x_test)
+
+    # Visualize the results
+    plt.figure(figsize=(10, 6))
+    plt.scatter(_y_test, y_pred, color='blue', label='Predicted vs Actual for Hold-out Set')
+    plt.plot([min(_y_test), max(_y_test)], [min(_y_test), max(_y_test)], color='red', linewidth=2, label='Ideal fit')
+    plt.title('KNN Regression: Predicted vs Actual')
+    plt.xlabel('Actual Predicted House Value')
+    plt.ylabel('Predicted Predicted House Value')
+    plt.legend()
+
+    plt.show()
+
+
 if __name__ == "__main__":
     evaluate_model()
+    plot_graph()
