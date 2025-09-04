@@ -109,7 +109,7 @@ class ModelService(AbstractModelService):
             "last_updated": self.last_updated
         }
         
-    def predict(self, house_data: HouseDataRequest):
+    def predict(self, house_data: HouseDataRequest) -> PredictionResponse:
         """Make a prediction using the loaded model."""
         predict_start = datetime.datetime.now()
 
